@@ -1,0 +1,32 @@
+{
+  "name": "rabbitmq-express",
+  "version": "1.0.0",
+  "description": "simple rabbitmq listener in the style of an express app",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "jest": {
+    "collectCoverage": true
+  },
+  "author": "MFT",
+  "license": "MIT",
+  "keywords": [
+    "RabbitMQ",
+    "amqp",
+    "Express",
+    "middleware"
+  ],
+  "homepage": "https://github.com/ClearEyesFullHearts/rabbitmq-express#readme",
+  "dependencies": {
+    "amqplib": "^0.10.3",
+    "debug": "^4.3.4",
+    "middlewary": "^2.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.35.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.27.5",
+    "jest": "^29.4.3"
+  }
+}
