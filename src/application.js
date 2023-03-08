@@ -76,41 +76,38 @@ class Application extends Queue {
   async listen({
     rabbitURI, exchange = '', exchangeType = 'topic', queue = '', consumerOptions = {},
   }) {
+    // trying to bind an anonymous queue to the default exchange is pointless
+    // since it can only be called by its name, so we forbid it.
     if (!exchange && !queue) throw new Error('You must define either an exchange or a queue');
+
     let exchangeName = exchange;
-    let exchangeOptions = {
-      durable: true,
-      internal: false,
-      autoDelete: false,
-      alternateExchange: '',
-      arguments: undefined,
-    };
+    let exchangeOptions;
     if (Object.prototype.toString.call(exchange) !== '[object String]') {
       const { name, ...options } = exchange;
       exchangeName = name || '';
       exchangeOptions = {
-        ...exchangeOptions,
+        durable: true,
+        internal: false,
+        autoDelete: false,
+        alternateExchange: '',
+        arguments: undefined,
         ...options,
       };
     }
-    debug('exchange', exchangeName, exchangeType, exchangeOptions);
 
     let queueName = queue;
-    let queueOptions = {
-      durable: true,
-      exclusive: false,
-      autoDelete: false,
-      arguments: undefined,
-    };
+    let queueOptions;
     if (Object.prototype.toString.call(queue) !== '[object String]') {
       const { name, ...options } = queue;
       queueName = name || '';
       queueOptions = {
-        ...queueOptions,
+        durable: true,
+        exclusive: false,
+        autoDelete: false,
+        arguments: undefined,
         ...options,
       };
     }
-    debug('queue', queueName, queueOptions);
 
     const consumerOpts = {
       consumerTag: '',
@@ -120,7 +117,6 @@ class Application extends Queue {
       arguments: undefined,
       ...consumerOptions,
     };
-    debug('consumer', consumerOpts);
 
     debug('Server connecting...');
     const connection = await amqplib.connect(rabbitURI);
@@ -128,23 +124,24 @@ class Application extends Queue {
     const channel = await connection.createChannel();
     this.chan = channel;
 
-    let actualExchangeName = exchangeName;
-    if (actualExchangeName !== '') {
-      const {
-        exchange: exName,
-      } = await channel.assertExchange(exchangeName, exchangeType, exchangeOptions);
-      actualExchangeName = exName;
+    // no need to assert the default exchange
+    if (exchangeName !== '') {
+      await channel.assertExchange(exchangeName, exchangeType, exchangeOptions);
     }
     debug('exchange asserted');
+
     const {
       queue: actualQueueName,
     } = await channel.assertQueue(queueName, queueOptions);
     debug('queue asserted');
 
-    if (actualExchangeName !== '') {
+    // We cannot bind topics to the default exchange, it only binds on the queue name
+    // Which, admittedly, defeats a bit the purpose of this module
+    // But I am not one to judge others.
+    if (exchangeName !== '') {
       const allPatterns = this.patterns;
       allPatterns.forEach((key) => {
-        channel.bindQueue(actualQueueName, actualExchangeName, key);
+        channel.bindQueue(actualQueueName, exchangeName, key);
       });
     }
     debug('binding done');
