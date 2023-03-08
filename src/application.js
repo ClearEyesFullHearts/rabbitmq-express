@@ -8,6 +8,7 @@
  * Module dependencies.
  * @private
  */
+const amqplib = require('amqplib');
 const debug = require('debug')('rabbitmq-express:application');
 
 const Queue = require('./queue');
@@ -20,6 +21,10 @@ class Application extends Queue {
       RouterClass: Queue,
       ...options,
     });
+
+    this.conn = undefined;
+    this.chan = undefined;
+    this.consumerTag = undefined;
 
     this.topicToPattern = (topic) => {
       if (topic === '.') return '#';
@@ -68,62 +73,106 @@ class Application extends Queue {
     return paths.map((t) => this.topicToPattern(t));
   }
 
-  /*
-  async listen(clientConfig, consumerConfig, fromBeginning = false) {
-    const { clientId, brokers } = clientConfig;
-    const { groupId } = consumerConfig;
-
-    // minimum required config for kafka
-    if (!clientId) throw new Error('clientId is mandatory in clientConfig');
-    if (!brokers) throw new Error('brokers is mandatory in clientConfig');
-    if (!groupId) throw new Error('groupId is mandatory in consumerConfig');
-    const myTopics = this.topics;
-    if (!myTopics || !myTopics.length || myTopics.length < 1) throw new Error('You need to subscribe to at least one topic');
-
-    const kafka = new Kafka(clientConfig);
-
-    this.consumer = kafka.consumer(consumerConfig);
-
-    debug('Server connecting...');
-    await this.consumer.connect();
-    await this.consumer.subscribe({ topics: myTopics, fromBeginning });
-
-    await this.consumer.run({
-      eachMessage: async (kafkaMessage) => {
-        await this.onMessage(this.consumer, kafkaMessage);
-      },
-    });
-
-    debug(`Server connected to ${brokers}`);
-  }
-
-  async onMessage(kafkaConsumer, kafkaMessage) {
-    function getLastCall(res, reject) {
-      return (err) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        res.end();
+  async listen({
+    rabbitURI, exchange = '', exchangeType = 'topic', queue = '', consumerOptions = {},
+  }) {
+    let exchangeName = exchange;
+    let exchangeOptions = {
+      durable: true,
+      internal: false,
+      autoDelete: false,
+      alternateExchange: '',
+      arguments: undefined,
+    };
+    if (Object.prototype.toString.call(exchange) !== '[object String]') {
+      const { name, ...options } = exchange;
+      exchangeName = name || '';
+      exchangeOptions = {
+        ...exchangeOptions,
+        ...options,
       };
     }
-    await new Promise((resolve, reject) => {
-      try {
-        const req = new Request(kafkaConsumer, kafkaMessage);
-        const res = new Response(req, resolve);
-        req.res = res;
 
-        this.handle(req, res, getLastCall(res, reject));
-      } catch (error) {
-        reject(error);
-      }
+    let queueName = queue;
+    let queueOptions = {
+      durable: true,
+      exclusive: false,
+      autoDelete: false,
+      arguments: undefined,
+    };
+    if (Object.prototype.toString.call(queue) !== '[object String]') {
+      const { name, ...options } = queue;
+      queueName = name || '';
+      queueOptions = {
+        ...queueOptions,
+        ...options,
+      };
+    }
+
+    const consumerOpts = {
+      consumerTag: '',
+      noAck: false,
+      exclusive: false,
+      priority: 0,
+      arguments: undefined,
+      ...consumerOptions,
+    };
+
+    debug('Server connecting...');
+    const connection = await amqplib.connect(rabbitURI);
+    this.conn = connection;
+    const channel = await connection.createChannel();
+    this.chan = channel;
+
+    const {
+      exchange: actualExchangeName,
+    } = await channel.assertExchange(exchangeName, exchangeType, exchangeOptions);
+    const {
+      queue: actualQueueName,
+    } = await channel.assertQueue(queueName, queueOptions);
+
+    const allPatterns = this.patterns;
+    allPatterns.forEach((key) => {
+      channel.bindQueue(actualQueueName, actualExchangeName, key);
     });
+
+    const {
+      consumerTag: actualConsumerTag,
+    } = await channel.consume(actualQueueName, (msg) => {
+      this.onMessage(channel, msg, !consumerOpts.noAck);
+    }, consumerOpts);
+    this.consumerTag = actualConsumerTag;
+    debug(`Server connected to ${rabbitURI} with consumerTag: ${this.consumerTag}`);
+  }
+
+  onMessage(channel, msg, acknowledgement) {
+    function getLastCall(res) {
+      return (err) => {
+        res.end(err);
+      };
+    }
+
+    let req;
+    let res;
+    try {
+      req = new Request(channel, msg, acknowledgement);
+      res = new Response(req);
+      req.res = res;
+
+      this.handle(req, res, getLastCall(res));
+    } catch (error) {
+      if (res) {
+        res.end(error);
+      }
+      throw error;
+    }
   }
 
   async stop() {
-    await this.consumer.disconnect();
+    await this.chan.cancel(this.consumerTag);
+    await this.chan.close();
+    await this.conn.close();
   }
-  */
 }
 
 /**
