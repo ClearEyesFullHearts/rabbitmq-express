@@ -76,6 +76,7 @@ class Application extends Queue {
   async listen({
     rabbitURI, exchange = '', exchangeType = 'topic', queue = '', consumerOptions = {},
   }) {
+    if (!exchange && !queue) throw new Error('You must define either an exchange or a queue');
     let exchangeName = exchange;
     let exchangeOptions = {
       durable: true,
@@ -92,6 +93,7 @@ class Application extends Queue {
         ...options,
       };
     }
+    debug('exchange', exchangeName, exchangeType, exchangeOptions);
 
     let queueName = queue;
     let queueOptions = {
@@ -108,6 +110,7 @@ class Application extends Queue {
         ...options,
       };
     }
+    debug('queue', queueName, queueOptions);
 
     const consumerOpts = {
       consumerTag: '',
@@ -117,6 +120,7 @@ class Application extends Queue {
       arguments: undefined,
       ...consumerOptions,
     };
+    debug('consumer', consumerOpts);
 
     debug('Server connecting...');
     const connection = await amqplib.connect(rabbitURI);
@@ -124,17 +128,26 @@ class Application extends Queue {
     const channel = await connection.createChannel();
     this.chan = channel;
 
-    const {
-      exchange: actualExchangeName,
-    } = await channel.assertExchange(exchangeName, exchangeType, exchangeOptions);
+    let actualExchangeName = exchangeName;
+    if (actualExchangeName !== '') {
+      const {
+        exchange: exName,
+      } = await channel.assertExchange(exchangeName, exchangeType, exchangeOptions);
+      actualExchangeName = exName;
+    }
+    debug('exchange asserted');
     const {
       queue: actualQueueName,
     } = await channel.assertQueue(queueName, queueOptions);
+    debug('queue asserted');
 
-    const allPatterns = this.patterns;
-    allPatterns.forEach((key) => {
-      channel.bindQueue(actualQueueName, actualExchangeName, key);
-    });
+    if (actualExchangeName !== '') {
+      const allPatterns = this.patterns;
+      allPatterns.forEach((key) => {
+        channel.bindQueue(actualQueueName, actualExchangeName, key);
+      });
+    }
+    debug('binding done');
 
     const {
       consumerTag: actualConsumerTag,
@@ -169,6 +182,7 @@ class Application extends Queue {
   }
 
   async stop() {
+    debug('gracefull exit');
     await this.chan.cancel(this.consumerTag);
     await this.chan.close();
     await this.conn.close();
