@@ -90,7 +90,7 @@ class Application extends Queue {
         durable: true,
         internal: false,
         autoDelete: false,
-        alternateExchange: '',
+        // alternateExchange: '',
         arguments: undefined,
         ...options,
       };
