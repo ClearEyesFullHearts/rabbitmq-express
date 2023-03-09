@@ -23,7 +23,7 @@ const run = async () => {
     }
 
     worker.use('work', (wreq, wres) => {
-      console.log(`server number ${worker.consumerTag} listens to all messages from exchange ${exchange} and queue ${queue}`);
+      console.log(`server number ${worker.consumerTag} listens to work messages from exchange ${exchange} and queue ${queue}`);
       wres.end();
     });
     worker.listen({
