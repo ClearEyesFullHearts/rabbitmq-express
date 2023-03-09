@@ -11,7 +11,7 @@
 
 const { Router, Layer } = require('middlewary');
 
-class Queue extends Router {
+class Topic extends Router {
   constructor(...args) {
     const [topicName, opt] = args;
     let myOptions = opt;
@@ -23,7 +23,7 @@ class Queue extends Router {
     }
 
     super({
-      RouterClass: Queue,
+      RouterClass: Topic,
       ...myOptions,
       delimiter: '.',
     });
@@ -34,7 +34,7 @@ class Queue extends Router {
   getTopics() {
     const mytopics = [];
     for (let i = 0; i < this.stack.length; i += 1) {
-      if (this.stack[i] instanceof Queue) {
+      if (this.stack[i] instanceof Topic) {
         mytopics.push(...this.stack[i].getTopics());
       } else if (this.stack[i] instanceof Layer) {
         if (this.stack[i].path && this.stack[i].path !== this.options.delimiter) {
@@ -46,4 +46,4 @@ class Queue extends Router {
   }
 }
 
-module.exports = Queue;
+module.exports = Topic;

@@ -11,14 +11,14 @@
 const amqplib = require('amqplib');
 const debug = require('debug')('rabbitmq-express:application');
 
-const Queue = require('./queue');
+const Topic = require('./topic');
 const Request = require('./request');
 const Response = require('./response');
 
-class Application extends Queue {
+class Application extends Topic {
   constructor(options) {
     super('.', {
-      RouterClass: Queue,
+      RouterClass: Topic,
       ...options,
     });
 
@@ -76,10 +76,6 @@ class Application extends Queue {
   async listen({
     rabbitURI, exchange = '', exchangeType = 'topic', queue = '', consumerOptions = {},
   }) {
-    // trying to bind an anonymous queue to the default exchange is pointless
-    // since it can only be called by its name, so we forbid it.
-    if (!exchange && !queue) throw new Error('You must define either an exchange or a queue');
-
     let exchangeName = exchange;
     let exchangeOptions;
     if (Object.prototype.toString.call(exchange) !== '[object String]') {
@@ -90,8 +86,8 @@ class Application extends Queue {
         durable: true,
         internal: false,
         autoDelete: false,
-        // alternateExchange: '',
-        arguments: undefined,
+        // alternateExchange: undefined,
+        // arguments: undefined,
         ...options,
       };
     }
@@ -105,7 +101,7 @@ class Application extends Queue {
         durable: true,
         exclusive: false,
         autoDelete: false,
-        arguments: undefined,
+        // arguments: undefined,
         ...options,
       };
     }
@@ -118,6 +114,10 @@ class Application extends Queue {
       arguments: undefined,
       ...consumerOptions,
     };
+
+    // trying to bind an anonymous queue to the default exchange is pointless
+    // since it can only be called by its name, so we forbid it.
+    if (!exchangeName && !queueName) throw new Error('trying to bind an anonymous queue to the default exchange is pointless. You must define either an exchange or a queue');
 
     debug('Server connecting...');
     let connection = rabbitURI;
@@ -186,9 +186,12 @@ class Application extends Queue {
     try {
       req = new Request(channel, msg, acknowledgement);
       res = new Response(req);
-      req.res = res;
 
-      this.handle(req, res, getLastCall(res));
+      const next = getLastCall(res);
+      req.res = res;
+      req.next = next;
+
+      this.handle(req, res, next);
     } catch (error) {
       if (res) {
         res.end(error);

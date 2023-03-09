@@ -10,7 +10,7 @@
  */
 
 const Application = require('./application');
-const Queue = require('./queue');
+const Topic = require('./topic');
 
 function createApplication() {
   const app = new Application();
@@ -22,5 +22,5 @@ function createApplication() {
  * Expose the prototypes.
  */
 module.exports = () => createApplication();
-module.exports.Queue = Queue;
+module.exports.Topic = Topic;
 module.exports.Application = Application;
