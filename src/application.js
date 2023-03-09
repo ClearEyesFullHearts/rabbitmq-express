@@ -197,11 +197,11 @@ class Application extends Queue {
     }
   }
 
-  async stop() {
-    debug('gracefull exit');
+  async stop(closeConnection = true) {
     await this.chan.cancel(this.consumerTag);
     await this.chan.close();
-    await this.conn.close();
+    if (closeConnection) await this.conn.close();
+    debug('gracefull exit');
   }
 }
 
