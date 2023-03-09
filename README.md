@@ -109,12 +109,21 @@ console.log(server.patterns);
   
 You can subscribe to topics using a Regexp and including parameters (i.e 'topic.name.:param'), these parameters will be added to the request object.  
 Note that the routing on the rabbit server side is dependent on the type of exchange used.  
-The "patterns" property of the application is a translation of the middleware paths to the amqp pattern used when subscribing to "topic" exchanges.  
-The "topics" property of the application are the middleware paths, it is used when subscribing to "direct" exchanges since the routing is done on exact match.  
+The "patterns" property of the application is a translation of the middleware paths to the amqp pattern used when subscribing to "topic" exchanges. Here are some examples:  
+```
+topics (regexp)             patterns
+:userId                  -> *
+:userId.*                -> #
+*.type                   -> #.type
+test.:type               -> test.*
+topic.:type.test         -> topic.*.test
+topic.:type.:userId.test -> topic.#.test
+```
+The "topics" property of the application are the middleware paths, it is used when subscribing to "direct" exchanges since the routing is done on exact match. In that case your topics shouldn't declare parameters.  
   
 ## server.listen
 The `listen` function is called with a configuration object that can declare 5 properties:  
-```javascript
+```
 {
   rabbitURI,
   exchange,
