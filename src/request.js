@@ -22,7 +22,7 @@ class Request extends EventEmitter {
     const { content, fields, properties } = rabbitMessage;
     this.rabbitChannel = rabbitChannel;
     this.topic = fields.routingKey;
-    this.path = fields.routingKey;
+    this.path = fields.routingKey || '';
     this.properties = properties;
     this.value = content.toString();
     this.body = null;

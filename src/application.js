@@ -83,8 +83,9 @@ class Application extends Queue {
     let exchangeName = exchange;
     let exchangeOptions;
     if (Object.prototype.toString.call(exchange) !== '[object String]') {
-      const { name, ...options } = exchange;
-      exchangeName = name || '';
+      const { name: nameEx, ...options } = exchange;
+      if (!nameEx) throw new Error('We cannot change the options of the default exchange');
+      exchangeName = nameEx || '';
       exchangeOptions = {
         durable: true,
         internal: false,
@@ -98,8 +99,8 @@ class Application extends Queue {
     let queueName = queue;
     let queueOptions;
     if (Object.prototype.toString.call(queue) !== '[object String]') {
-      const { name, ...options } = queue;
-      queueName = name || '';
+      const { name: nameQ, ...options } = queue;
+      queueName = nameQ || '';
       queueOptions = {
         durable: true,
         exclusive: false,
@@ -119,7 +120,10 @@ class Application extends Queue {
     };
 
     debug('Server connecting...');
-    const connection = await amqplib.connect(rabbitURI);
+    let connection = rabbitURI;
+    if (Object.prototype.toString.call(rabbitURI) === '[object String]') {
+      connection = await amqplib.connect(rabbitURI);
+    }
     this.conn = connection;
     const channel = await connection.createChannel();
     this.chan = channel;
@@ -139,7 +143,22 @@ class Application extends Queue {
     // Which, admittedly, defeats a bit the purpose of this module
     // But I am not one to judge others.
     if (exchangeName !== '') {
-      const allPatterns = this.patterns;
+      let allPatterns;
+      switch (exchangeType) {
+        // probably shouldn't use header exchange type
+        // as it won't match the middlewares on anything.
+        case 'header':
+        case 'fanout':
+          allPatterns = [''];
+          break;
+        case 'direct':
+          allPatterns = this.topics;
+          break;
+        case 'topic':
+        default:
+          allPatterns = this.patterns;
+          break;
+      }
       allPatterns.forEach((key) => {
         channel.bindQueue(actualQueueName, exchangeName, key);
       });
