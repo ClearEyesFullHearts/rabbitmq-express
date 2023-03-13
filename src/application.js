@@ -178,6 +178,7 @@ class Application extends Topic {
     function getLastCall(res) {
       return (err) => {
         res.end(err);
+        if (err) throw err;
       };
     }
 
