@@ -80,4 +80,99 @@ describe('Application tests', () => {
 
     app.onMessage(channel, msg, true);
   });
+
+  test('Response emit finish on end', (done) => {
+    const msg = {
+      content: JSON.stringify({ foo: 'bar' }),
+      fields: {
+        routingKey: 'topic.user',
+      },
+      properties: {},
+    };
+    let ackCalled = false;
+    let nackCalled = false;
+    const channel = {
+      ack: () => { ackCalled = true; },
+      nack: () => { nackCalled = true; },
+    };
+
+    const app = new Application();
+    const result = [];
+    app.use((req, res, next) => {
+      res.once('finish', (resp) => {
+        expect(resp).toBe(res);
+        expect(nackCalled).toBeFalsy();
+        expect(ackCalled).toBeTruthy();
+        done();
+      });
+      next();
+    });
+    app.use((req, res, next) => {
+      result.push('first');
+      next();
+    });
+
+    app.use('topic.*', (req, res, next) => {
+      result.push('second');
+      next();
+    });
+
+    const testTopic = new Topic('topic');
+    testTopic.use('user', (req, res, next) => {
+      result.push('third');
+      res.end();
+    });
+
+    app.use(testTopic);
+
+    app.onMessage(channel, msg, true);
+  });
+
+  test('Response emit finish on Uncaught error', (done) => {
+    const msg = {
+      content: JSON.stringify({ foo: 'bar' }),
+      fields: {
+        routingKey: 'topic.user',
+      },
+      properties: {},
+    };
+    let ackCalled = false;
+    let nackCalled = false;
+    const channel = {
+      ack: () => { ackCalled = true; },
+      nack: () => { nackCalled = true; },
+    };
+
+    const app = new Application();
+    const result = [];
+    app.use((req, res, next) => {
+      res.once('finish', (err, resp) => {
+        expect(resp).toBe(res);
+        expect(err).toBeInstanceOf(Error);
+        expect(nackCalled).toBeTruthy();
+        expect(ackCalled).toBeFalsy();
+        done();
+      });
+      next();
+    });
+    app.use((req, res, next) => {
+      result.push('first');
+      next();
+    });
+
+    app.use('topic.*', (req, res, next) => {
+      result.push('second');
+      next();
+    });
+
+    const testTopic = new Topic('topic');
+    testTopic.use('user', (req, res, next) => {
+      result.push('third');
+      res.end(new Error('error from middleware'));
+    });
+
+    app.use(testTopic);
+
+    app.onMessage(channel, msg, true);
+  });
 });

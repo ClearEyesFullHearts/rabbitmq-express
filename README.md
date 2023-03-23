@@ -33,12 +33,12 @@ server.use('another-test-topic', (req, res, next) => {
 
 server.use('test.topic.*', (req, res, next) => {
   console.log('all topics that start by test.topic middleware');
-  res.end();
+  res.status(201).end();
 });
 
 server.use((err, req, res, next) => {
   console.log('Global error middleware');
-  next();
+  res.status(500).end(err);
 });
 
 server.listen({
@@ -55,9 +55,8 @@ If you are unfamiliar with how express middlewares work, I would suggest you rea
 For obvious reasons the request and reponse objects you receive in your middlewares are different than for a HTTP request:  
 ```
 const {
+  app, // The rabbitmq-express running application
   raw, // raw rabbitmq message (rabbit message)
-  rabbitChannel, // The amqplib channel object in case you to need to interact with it in your handlers (channel object)
-  acknowledge, // flag to trigger the message acknowledgement at the end of the cycle, coming from the consumer options (boolean)
   properties, // message properties if present (object)
   fields, // message fields if present (object)
   topic, // name of the topic (routing key) sending the message (string)
@@ -70,10 +69,16 @@ const {
 } = req;
 
 const {
+  rabbitChannel, // The amqplib channel object in case you to need to interact with it in your handlers (channel object)
+  acknowledge, // flag to trigger the message acknowledgement at the end of the cycle, coming from the consumer options (boolean)
+  req, // The request object
+  statusCode, // Status code for the response (default to 200)
+  
   end(), // function to call to end the request-response cycle
+  status(), // Sets the status for the response. It is chainable.
 } = res;
 ```
-The request object is an event dispatcher and emits the 'close' event when the request cycle ends.  
+The response object is an event dispatcher and emits the 'finish' event when the request cycle ends.  
   
 The "Topic" object replaces the Router object. Note that you can mount a topic to another topic to create chained topics but only those that have a mounted middleware will be subscribed to the rabbit exchange.  
 ```javascript
@@ -181,4 +186,4 @@ A [consumer options object](https://amqp-node.github.io/amqplib/channel_api.html
 }
 ```
 All fields are optional.  
-Note that `noAck` value is used by the request to automatically send, or not, the acknowledgement at the end of the cycle.  
+Note that `noAck` value is used by the response to automatically send, or not, the acknowledgement at the end of the cycle.  

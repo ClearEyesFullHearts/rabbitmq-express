@@ -185,8 +185,8 @@ class Application extends Topic {
     let req;
     let res;
     try {
-      req = new Request(channel, msg, acknowledgement);
-      res = new Response(req);
+      req = new Request(this, msg);
+      res = new Response(req, channel, acknowledgement);
 
       const next = getLastCall(res);
       req.res = res;

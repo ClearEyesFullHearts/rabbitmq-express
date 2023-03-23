@@ -9,18 +9,15 @@
  * @private
  */
 
-const { EventEmitter } = require('events');
 const debug = require('debug')('rabbitmq-express:request');
 
-class Request extends EventEmitter {
-  constructor(rabbitChannel, rabbitMessage, acknowledgement) {
-    super();
-
+class Request {
+  constructor(app, rabbitMessage) {
+    this.app = app;
     this.raw = {
       ...rabbitMessage,
     };
     const { content, fields, properties } = rabbitMessage;
-    this.rabbitChannel = rabbitChannel;
     this.fields = fields;
     this.properties = properties;
     this.topic = fields.routingKey;
@@ -33,30 +30,8 @@ class Request extends EventEmitter {
       debug('message.value is not a json body');
     }
 
-    this.acknowledge = acknowledgement;
-
     this.params = {};
-
-    this.isEnded = false;
     debug('Request created');
-  }
-
-  end() {
-    if (this.isEnded) throw new Error('Request has already ended');
-
-    this.isEnded = true;
-    if (this.acknowledge) this.rabbitChannel.ack(this.raw, false);
-    debug('Request ended');
-    this.emit('close');
-  }
-
-  errored() {
-    if (this.isEnded) throw new Error('Request has already ended');
-
-    this.isEnded = true;
-    if (this.acknowledge) this.rabbitChannel.nack(this.raw, false, true);
-    debug('Request ended with error');
-    this.emit('close');
   }
 }
 

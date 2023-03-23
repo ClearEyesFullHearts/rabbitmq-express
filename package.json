@@ -1,10 +1,10 @@
 {
   "name": "rabbitmq-express",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "simple rabbitmq listener in the style of an express app",
   "main": "index.js",
   "scripts": {
-    "test": "jest"
+    "test": "set DEBUG=rabbitmq-express:*&& jest"
   },
   "jest": {
     "collectCoverage": true
