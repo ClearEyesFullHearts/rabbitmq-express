@@ -20,6 +20,10 @@ class Request {
     const { content, fields, properties } = rabbitMessage;
     this.fields = fields;
     this.properties = properties;
+    this.headers = {};
+    if (properties.headers) {
+      this.headers = properties.headers;
+    }
     this.topic = fields.routingKey;
     this.path = fields.routingKey || '';
     this.value = content.toString();
