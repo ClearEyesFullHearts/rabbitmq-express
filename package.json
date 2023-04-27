@@ -1,6 +1,6 @@
 {
   "name": "rabbitmq-express",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "simple rabbitmq listener in the style of an express app",
   "main": "index.js",
   "scripts": {

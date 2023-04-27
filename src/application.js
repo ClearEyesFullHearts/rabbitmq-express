@@ -25,6 +25,7 @@ class Application extends Topic {
     this.conn = undefined;
     this.chan = undefined;
     this.consumerTag = undefined;
+    this.activeResponses = 0;
 
     this.topicToPattern = (topic) => {
       if (topic === '.') return '#';
@@ -187,6 +188,8 @@ class Application extends Topic {
     try {
       req = new Request(this, msg);
       res = new Response(req, channel, acknowledgement);
+      this.activeResponses += 1;
+      res.once('finish', () => { this.activeResponses -= 1; });
 
       const next = getLastCall(res);
       req.res = res;
@@ -201,11 +204,40 @@ class Application extends Topic {
     }
   }
 
-  async stop(closeConnection = true) {
-    await this.chan.cancel(this.consumerTag);
-    await this.chan.close();
-    if (closeConnection) await this.conn.close();
-    debug('gracefull exit');
+  async stop(closeConnection = true, maxTry = 250) {
+    function waitForLastResponse(me, counter, max) {
+      if (me.activeResponses === 0) {
+        debug('Last response ended, close channel');
+        me.chan.close();
+      } else {
+        if (counter > max) {
+          throw new Error('Server should be closed by now');
+        }
+        setTimeout(() => {
+          const count = counter + 1;
+          waitForLastResponse(me, count, max);
+        }, 20);
+      }
+    }
+    return new Promise((resolve) => {
+      this.chan.cancel(this.consumerTag)
+        .then(() => {
+          debug('Channel canceled');
+          this.chan.once('close', async () => {
+            debug('Channel closed');
+            if (closeConnection) {
+              this.conn.close()
+                .then(() => {
+                  debug('Connection closed');
+                  resolve();
+                });
+            } else {
+              resolve();
+            }
+          });
+          waitForLastResponse(this, 0, maxTry);
+        });
+    });
   }
 }
 
